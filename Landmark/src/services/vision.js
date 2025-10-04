@@ -1,4 +1,4 @@
-import serviceAccount from '../../lankdmark-9ee814893a33.json';
+import serviceAccount from '../../lankdmark-bac248f4ca2f.json';
 
 const VISION_ENDPOINT = 'https://vision.googleapis.com/v1/images:annotate';
 const TOKEN_ENDPOINT = 'https://oauth2.googleapis.com/token';

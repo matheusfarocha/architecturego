@@ -1,37 +1,54 @@
-const DEFAULT_MODELS = [
-  'gemini-1.5-flash',
-  'gemini-1.5-flash-8b',
-  'gemini-1.0-pro',
-  'gemini-pro',
-];
+// Fallbacks removed — single configured model only
 
 function buildEndpoint(modelId) {
   return `https://generativelanguage.googleapis.com/v1/models/${modelId}:generateContent`;
 }
 
-function buildPrompt(landmarkName) {
+function buildPrompt(landmarkName, coords) {
+  const where = coords?.latitude && coords?.longitude
+    ? ` (approx. lat ${coords.latitude.toFixed(3)}, lon ${coords.longitude.toFixed(3)})`
+    : '';
+  const target = landmarkName ? `${landmarkName}${where}` : `this location${where}`;
+
   return (
-    `give me information about ${landmarkName}. Respond with 2-3 sentences that cover where it is located, ` +
-    'one notable historical or cultural fact, and one fun fact or visitor tip.'
+    `You are a concise travel guide. In 2-3 sentences, describe ${target} for a general audience. ` +
+    `Then add one short fun fact. Respond ONLY as minified JSON with keys: ` +
+    `{"description": string, "funFact": string}.`
   );
+}
+
+function tryParseJsonFromText(text) {
+  if (!text || typeof text !== 'string') return null;
+  let t = text.trim();
+  // Strip Markdown fences if present
+  if (t.startsWith('```')) {
+    t = t.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  }
+  try {
+    const parsed = JSON.parse(t);
+    if (parsed && typeof parsed === 'object') {
+      const d = typeof parsed.description === 'string' ? parsed.description.trim() : '';
+      const f = typeof parsed.funFact === 'string' ? parsed.funFact.trim() : '';
+      if (d || f) return { description: d, funFact: f };
+    }
+  } catch (_) {
+    // fall through
+  }
+  return null;
 }
 
 function extractTextFromResponse(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
-  if (!Array.isArray(parts)) {
-    return null;
-  }
-
+  if (!Array.isArray(parts)) return null;
   const text = parts
-    .map((part) => part?.text || '')
+    .map((p) => (typeof p?.text === 'string' ? p.text : ''))
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
-
   return text || null;
 }
 
-async function requestDescription(modelId, payload, apiKey) {
+async function requestGuide(modelId, payload, apiKey) {
   const endpoint = buildEndpoint(modelId);
   const response = await fetch(`${endpoint}?key=${apiKey}`, {
     method: 'POST',
@@ -44,16 +61,15 @@ async function requestDescription(modelId, payload, apiKey) {
     const isNotFound = response.status === 404 || errorPayload?.error?.code === 404;
     const message = errorPayload?.error?.message || 'Gemini request failed.';
     const error = new Error(message);
-    if (isNotFound) {
-      error.code = 'MODEL_NOT_FOUND';
-    }
+    if (isNotFound) error.code = 'MODEL_NOT_FOUND';
     throw error;
   }
 
   const data = await response.json();
-  const text = extractTextFromResponse(data);
-  if (text) {
-    return text;
+  const raw = extractTextFromResponse(data);
+  if (raw) {
+    const parsed = tryParseJsonFromText(raw);
+    if (parsed) return parsed;
   }
 
   if (data?.promptFeedback?.blockReason) {
@@ -63,57 +79,40 @@ async function requestDescription(modelId, payload, apiKey) {
     throw error;
   }
 
-  const noContentError = new Error('Gemini did not return any content.');
+  const noContentError = new Error('Gemini did not return usable content.');
   noContentError.code = 'NO_CONTENT';
   throw noContentError;
 }
 
-export async function describeLandmark(landmarkName) {
+export async function chatAboutLocation(landmarkName, coords) {
   const apiKey = import.meta.env.VITE_GEMINI_KEY;
   if (!apiKey) {
-    throw new Error('Missing Gemini API key.');
-  }
-
-  if (!landmarkName) {
-    throw new Error('Landmark name is required.');
+    throw new Error('Missing Gemini API key (VITE_GEMINI_KEY).');
   }
 
   const payload = {
     contents: [
       {
         role: 'user',
-        parts: [{ text: buildPrompt(landmarkName) }],
+        parts: [{ text: buildPrompt(landmarkName, coords) }],
       },
     ],
     generationConfig: {
-      temperature: 0.3,
+      temperature: 0.4,
       maxOutputTokens: 256,
     },
   };
 
-  const preferredModel = import.meta.env.VITE_GEMINI_MODEL;
-  const modelsToTry = preferredModel
-    ? [preferredModel, ...DEFAULT_MODELS.filter((model) => model !== preferredModel)]
-    : DEFAULT_MODELS;
-
-  let lastError = null;
-  for (const model of modelsToTry) {
-    try {
-      return await requestDescription(model, payload, apiKey);
-    } catch (error) {
-      lastError = error;
-      if (!['MODEL_NOT_FOUND', 'NO_CONTENT', 'BLOCKED'].includes(error?.code)) {
-        break;
-      }
+  const model = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-pro';
+  try {
+    return await requestGuide(model, payload, apiKey);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : String(err);
+    const e = new Error(`Gemini chat failed for model ${model}: ${message}`);
+    if (err && typeof err === 'object' && 'code' in err) {
+      // preserve error code if present (e.g., MODEL_NOT_FOUND)
+      e.code = err.code;
     }
+    throw e;
   }
-
-  if (preferredModel) {
-    throw lastError || new Error('Gemini model request failed.');
-  }
-
-  const supportedList = DEFAULT_MODELS.join(', ');
-  throw new Error(
-    `Gemini request failed. None of the fallback models responded (tried: ${supportedList}). Set VITE_GEMINI_MODEL to a supported model or verify API access. Last error: ${lastError?.message || 'unknown'}.`,
-  );
 }

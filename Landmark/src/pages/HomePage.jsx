@@ -3,7 +3,7 @@ import { FiCamera, FiInfo, FiSave } from 'react-icons/fi';
 import { TbMapPin } from 'react-icons/tb';
 import { useLandmarks } from '../context/LandmarkContext.jsx';
 import { detectLandmarks } from '../services/vision.js';
-import { describeLandmark } from '../services/gemini.js';
+import { chatAboutLocation } from '../services/gemini.js';
 import './HomePage.css';
 
 function HomePage() {
@@ -17,6 +17,9 @@ function HomePage() {
   const [videoReady, setVideoReady] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [lastSnapshot, setLastSnapshot] = useState(null);
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState(null);
+  const [aiGuide, setAiGuide] = useState(null);
 
   useEffect(() => {
     const requestStream = async () => {
@@ -90,6 +93,8 @@ function HomePage() {
 
     setIsSaving(true);
     setStatus('Analyzing snapshot for landmarks…');
+    setAiGuide(null);
+    setAiError(null);
 
     const timestamp = new Date().toISOString();
     const defaultName = `Snapshot ${new Date(timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`;
@@ -105,18 +110,7 @@ function HomePage() {
     }
 
     const primary = annotations[0] || null;
-    let description = null;
-    let descriptionError = null;
-
-    if (primary?.description && !analysisError) {
-      try {
-        setStatus(`Landmark detected: ${primary.description}. Gathering story…`);
-        description = await describeLandmark(primary.description);
-      } catch (error) {
-        console.error('Gemini description failed', error);
-        descriptionError = error instanceof Error ? error.message : 'Unable to describe this landmark right now.';
-      }
-    }
+    // Description feature removed
 
     const capture = {
       id: `${Date.now()}`,
@@ -130,18 +124,12 @@ function HomePage() {
       location: primary?.location || null,
       score: primary?.score || null,
       analysisError,
-      description,
-      descriptionError,
     };
 
     addCapture(capture);
     setLastSnapshot(capture);
 
-    if (description) {
-      setStatus(`Landmark detected: ${primary.description}. Description ready.`);
-    } else if (descriptionError && primary?.description) {
-      setStatus('Snapshot saved—landmark detected but story unavailable.');
-    } else if (primary?.description) {
+    if (primary?.description) {
       setStatus(`Landmark detected: ${primary.description}`);
     } else if (analysisError) {
       setStatus('Snapshot saved—landmark insight unavailable right now.');
@@ -150,13 +138,26 @@ function HomePage() {
     }
 
     setIsSaving(false);
+
+    // Trigger AI guide generation if we have a primary landmark
+    if (primary?.description && !analysisError) {
+      setAiLoading(true);
+      try {
+        const guide = await chatAboutLocation(primary.description, primary.location);
+        setAiGuide(guide);
+      } catch (error) {
+        console.error('Gemini chat failed', error);
+        setAiError(error instanceof Error ? error.message : 'Unable to fetch AI guide.');
+      } finally {
+        setAiLoading(false);
+      }
+    }
   };
 
   const snapshotHasLabels = Array.isArray(lastSnapshot?.labels) && lastSnapshot.labels.length > 0;
   const snapshotHasLocation = Boolean(lastSnapshot?.location?.latitude) && Boolean(lastSnapshot?.location?.longitude);
   const snapshotHasError = Boolean(lastSnapshot?.analysisError);
-  const snapshotHasDescription = Boolean(lastSnapshot?.description);
-  const snapshotDescriptionError = Boolean(lastSnapshot?.descriptionError);
+  // Description fields removed
 
   return (
     <section className="home-page">
@@ -198,6 +199,30 @@ function HomePage() {
         </div>
       </div>
 
+      <div className="gradient-card" style={{ marginTop: '1rem' }}>
+        <h3>AI Guide</h3>
+        {!videoReady && !lastSnapshot && (
+          <p>Capture a snapshot to get a description and a fun fact.</p>
+        )}
+        {aiLoading && <p>Generating a short description and fun fact…</p>}
+        {!aiLoading && aiError && (
+          <p className="snapshot-warning">{aiError}</p>
+        )}
+        {!aiLoading && !aiError && aiGuide && (
+          <div>
+            {aiGuide.description && (
+              <p className="snapshot-description">{aiGuide.description}</p>
+            )}
+            {aiGuide.funFact && (
+              <p className="snapshot-note">Fun fact: {aiGuide.funFact}</p>
+            )}
+          </div>
+        )}
+        {!aiLoading && !aiError && !aiGuide && videoReady && (
+          <p>Point your camera at a landmark, then capture to get insights.</p>
+        )}
+      </div>
+
       {lastSnapshot && (
         <div className="snapshot-summary gradient-card">
           <h3>Latest snapshot</h3>
@@ -230,14 +255,8 @@ function HomePage() {
               ) : (
                 <p className="snapshot-note">No landmarks detected this time.</p>
               )}
-              {snapshotHasDescription && (
-                <p className="snapshot-description">{lastSnapshot.description}</p>
-              )}
               {snapshotHasError && (
                 <p className="snapshot-warning">Vision service unavailable: {lastSnapshot.analysisError}</p>
-              )}
-              {snapshotDescriptionError && (
-                <p className="snapshot-warning">Gemini service unavailable: {lastSnapshot.descriptionError}</p>
               )}
               <p className="snapshot-note snapshot-library-note">Find every saved moment in your library tab.</p>
             </div>

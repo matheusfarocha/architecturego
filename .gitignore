@@ -1,0 +1,15 @@
+# Global ignores
+.DS_Store
+*.log
+
+# Node/Vite artifacts
+node_modules/
+dist/
+.vite/
+.env
+.env.*
+*.env
+*.local
+
+# Credentials
+lankdmark-*.json

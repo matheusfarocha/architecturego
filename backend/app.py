@@ -12,12 +12,16 @@ SUPABASE_URL = os.getenv("SUPABASE_URL")
 SUPABASE_KEY = os.getenv("SUPABASE_KEY")
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
-# --- SIGNUP ---
+# --- AUTH ROUTES ---
+
 @app.route('/signup', methods=['POST'])
 def signup():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
+
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
 
     try:
         res = supabase.auth.sign_up({"email": email, "password": password})
@@ -28,78 +32,90 @@ def signup():
     except Exception as e:
         return jsonify({"error": str(e)}), 400
 
-
-# --- LOGIN ---
 @app.route('/login', methods=['POST'])
 def login():
     data = request.get_json()
     email = data.get('email')
     password = data.get('password')
 
+    if not email or not password:
+        return jsonify({"error": "Email and password are required"}), 400
+
     try:
         res = supabase.auth.sign_in_with_password({"email": email, "password": password})
-        session['access_token'] = res.session.access_token
-        session['user'] = res.user.email
-        return jsonify({"message": "Logged in!", "email": res.user.email})
+        if res.user:
+            session['access_token'] = res.session.access_token
+            session['user'] = res.user.email
+            return jsonify({"message": "Logged in!", "email": res.user.email})
+        else:
+            return jsonify({"error": "Login failed."}), 401
     except Exception as e:
         return jsonify({"error": str(e)}), 401
 
-
-# --- LOGOUT ---
 @app.route('/logout', methods=['POST'])
 def logout():
     session.clear()
     return jsonify({"message": "Logged out successfully"})
 
-
-# --- PROFILE ---
 @app.route('/profile', methods=['GET'])
 def profile():
-    """Show current logged-in user's profile."""
     if 'user' in session:
         return jsonify({"logged_in_as": session['user']})
-    else:
-        return jsonify({"error": "Not logged in"}), 401
+    return jsonify({"error": "Not logged in"}), 401
 
+# --- SCAN ROUTES ---
 
-# --- RECEIVE SCAN ---
 @app.route('/receive_scan', methods=['POST'])
-def handle_scan():
-    data = request.get_json()
-    user_email = session.get('user')
-
-    if not user_email:
+def receive_scan():
+    if 'user' not in session:
         return jsonify({"error": "Not logged in"}), 401
 
+    data = request.get_json()
+    user_email = session['user']
+    id_ = data.get('id')
     what = data.get('what')
-    when = data.get('when')
     where = data.get('where')
 
-    # Store scan data in Supabase
-    res = supabase.table("scans").insert({
-        "user_email": user_email,
-        "what": what,
-        "when": when,
-        "where": where
-    }).execute()
+    if not id_ or not what or not where:
+        return jsonify({"error": "id, what, and where are required"}), 400
 
-    return jsonify({"message": "Scan received!", "data": res.data})
+    try:
+        # Check for duplicates
+        existing = supabase.table("main").select("*", count="exact")\
+            .eq("id", id_).eq("what", what).execute()
 
+        if existing.count >= 1:
+            return jsonify({"message": "Already scanned"}), 400
 
-# --- COLLECTION ---
+        # Insert scan
+        supabase.table("main").insert({
+            "user_email": user_email,
+            "id": id_,
+            "what": what,
+            "where": where
+        }).execute()
+
+        # Placeholder for extra data (desc, image)
+        desc = None
+        img = None
+
+        return jsonify({"message": "Scan saved!", "desc": desc, "image": img})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
 @app.route('/collection', methods=['GET'])
-def handle_collection():
-    user_email = session.get('user')
-
-    if not user_email:
+def collection():
+    if 'user' not in session:
         return jsonify({"error": "Not logged in"}), 401
 
-    res = supabase.table("scans").select("*").eq("user_email", user_email).execute()
+    user_email = session['user']
 
-    return jsonify({
-        "collection": res.data
-    })
+    try:
+        scans = supabase.table("main").select("*").eq("user_email", user_email).execute()
+        return jsonify({"collection": scans.data})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-
+# --- RUN SERVER ---
 if __name__ == '__main__':
     app.run(debug=True)

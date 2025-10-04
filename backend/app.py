@@ -8,6 +8,7 @@ app = Flask(__name__)
 
 @app.route('/receive_scan', methods=['POST'])
 def handle_scan():
+    
     if request.method == 'POST':
         id = request.form['id']
         what = request.form['what']
@@ -27,7 +28,8 @@ def handle_scan():
         ##### get desc, data, etc...  from wherever scan is pulling it from possibly, if not query somethin else
         desc = None
         img = None
-        return {'desc': desc, 'image': img}
+
+        return 
 
 @app.route('/profile', methods=['POST'])
 def handle_profile():
@@ -37,8 +39,8 @@ def handle_profile():
         url: str = os.environ.get("SUPABASE_URL")
         key: str = os.environ.get("SUPABASE_KEY")
         supabase: Client = create_client(url, key)
-        pieces = supabase.table("main").select("*", count="exact").eq("id", id).execute().count
-        return pieces
+        amount = supabase.table("main").select("*", count="exact").eq("id", id).execute().count
+        return amount
         
 @app.route('/collection', methods=['POST'])
 def handle_collection():

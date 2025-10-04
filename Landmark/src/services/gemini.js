@@ -19,20 +19,45 @@ function buildPrompt(landmarkName, coords) {
 
 function tryParseJsonFromText(text) {
   if (!text || typeof text !== 'string') return null;
-  let t = text.trim();
+  const seen = new Set();
+  const candidates = [];
+  const trimmed = text.trim();
+
+  const addCandidate = (value) => {
+    if (!value || typeof value !== 'string') return;
+    const candidate = value.trim();
+    if (!candidate || seen.has(candidate)) return;
+    seen.add(candidate);
+    candidates.push(candidate);
+  };
+
+  // Raw text
+  addCandidate(trimmed);
+
   // Strip Markdown fences if present
-  if (t.startsWith('```')) {
-    t = t.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim();
+  const fenceMatch = trimmed.match(/```(?:json)?([\s\S]*?)```/i);
+  if (fenceMatch) {
+    addCandidate(fenceMatch[1]);
   }
-  try {
-    const parsed = JSON.parse(t);
-    if (parsed && typeof parsed === 'object') {
-      const d = typeof parsed.description === 'string' ? parsed.description.trim() : '';
-      const f = typeof parsed.funFact === 'string' ? parsed.funFact.trim() : '';
-      if (d || f) return { description: d, funFact: f };
+
+  // Extract first JSON-looking block
+  const firstBrace = trimmed.indexOf('{');
+  const lastBrace = trimmed.lastIndexOf('}');
+  if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+    addCandidate(trimmed.slice(firstBrace, lastBrace + 1));
+  }
+
+  for (const candidate of candidates) {
+    try {
+      const parsed = JSON.parse(candidate);
+      if (parsed && typeof parsed === 'object') {
+        const d = typeof parsed.description === 'string' ? parsed.description.trim() : '';
+        const f = typeof parsed.funFact === 'string' ? parsed.funFact.trim() : '';
+        if (d || f) return { description: d, funFact: f };
+      }
+    } catch (_) {
+      // try next candidate
     }
-  } catch (_) {
-    // fall through
   }
   return null;
 }
@@ -41,7 +66,27 @@ function extractTextFromResponse(data) {
   const parts = data?.candidates?.[0]?.content?.parts;
   if (!Array.isArray(parts)) return null;
   const text = parts
-    .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+    .map((p) => {
+      if (typeof p?.text === 'string') {
+        return p.text;
+      }
+      if (p?.functionCall?.args) {
+        try {
+          return JSON.stringify(p.functionCall.args);
+        } catch (_) {
+          return '';
+        }
+      }
+      if (p?.inlineData?.data) {
+        try {
+          const decoded = atob(p.inlineData.data);
+          return decoded || '';
+        } catch (_) {
+          return '';
+        }
+      }
+      return '';
+    })
     .join(' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -70,6 +115,22 @@ async function requestGuide(modelId, payload, apiKey) {
   if (raw) {
     const parsed = tryParseJsonFromText(raw);
     if (parsed) return parsed;
+
+    // Fallback: derive description/fun fact from plain text
+    let description = raw;
+    let funFact = '';
+    const funMatch = raw.match(/fun fact[:\-]\s*(.+)$/i);
+    if (funMatch) {
+      funFact = funMatch[1].trim();
+      description = raw.slice(0, funMatch.index).trim();
+    }
+    console.log(description, funFact);
+    if (description || funFact) {
+      return {
+        description,
+        funFact,
+      };
+    }
   }
 
   if (data?.promptFeedback?.blockReason) {
@@ -99,13 +160,13 @@ export async function chatAboutLocation(landmarkName, coords) {
     ],
     generationConfig: {
       temperature: 0.4,
-      maxOutputTokens: 256,
+      maxOutputTokens: 1500,
     },
   };
 
   const model = import.meta.env.VITE_GEMINI_MODEL || 'gemini-2.5-pro';
   try {
-    return await requestGuide(model, payload, apiKey);
+    return await requestGuide('gemini-2.5-flash', payload, apiKey);
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     const e = new Error(`Gemini chat failed for model ${model}: ${message}`);

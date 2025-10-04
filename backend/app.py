@@ -13,15 +13,21 @@ def handle_scan():
         when = request.form['where']
         #send to database
         
-        # get desc, data, etc... 
+        # get desc, data, etc...  from wherever scan is pulling it from possibly, if not query somethin else
         desc = None
         img = None
         return ['desc': desc, 'image': img]
 
-@app.route('/profile', methods = ['POST'])
+@app.route('/profile', methods=['GET'])
 def handle_profile():
-    if request.method == ['POST']:
+    if request.method == 'GET':
         id = request.form['id']
-        # collect total art scanned by id, whatever else
-        # variable with stats
+        #collect total art scanned by id, whatever else
+        #return variable with stats
         
+@app.route('collection', methods=['GET'])
+def handle_collection():
+    if request.method == 'GET':
+        id = request.form['id']
+        #query supabase collecting stuff
+        # return imgs (possibly link), descs, etc. how they want it ig

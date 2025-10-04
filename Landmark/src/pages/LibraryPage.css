@@ -139,3 +139,14 @@
   font-size: 0.88rem;
   color: var(--color-muted);
 }
+
+.library-warning {
+  color: #a23c34;
+}
+
+.library-description {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--color-secondary);
+}

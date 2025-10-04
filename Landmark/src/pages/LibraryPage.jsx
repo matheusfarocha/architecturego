@@ -33,6 +33,9 @@ function LibraryPage() {
             const hasLabels = Array.isArray(capture.labels) && capture.labels.length > 0;
             const hasLocation = Boolean(capture.location?.latitude) && Boolean(capture.location?.longitude);
             const hasConfidence = typeof capture.score === 'number';
+            const hasError = Boolean(capture.analysisError);
+            const hasDescription = typeof capture.description === 'string' && capture.description.trim().length > 0;
+            const hasDescriptionError = Boolean(capture.descriptionError);
 
             return (
               <article key={capture.id} className="library-card surface-card">
@@ -65,7 +68,16 @@ function LibraryPage() {
                       ))}
                     </div>
                   ) : (
-                    <p className="library-note">Saved from the live camera.</p>
+                    <p className={`library-note${hasError ? ' library-warning' : ''}`}>
+                      {hasError ? 'Vision service unavailable—snapshot saved for later.' : 'Saved from the live camera.'}
+                    </p>
+                  )}
+                  {hasDescription && <p className="library-description">{capture.description}</p>}
+                  {hasError && (
+                    <p className="library-note library-warning">{capture.analysisError}</p>
+                  )}
+                  {hasDescriptionError && (
+                    <p className="library-note library-warning">{capture.descriptionError}</p>
                   )}
                 </div>
               </article>

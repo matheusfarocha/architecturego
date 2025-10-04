@@ -2,9 +2,21 @@ from flask import Flask, request
 import os
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from google import genai
 
+load_dotenv()
 app = Flask(__name__)
+GEMINI_KEY = os.environ.get("GEMINI_KEY")
+client = genai.Client(api_key=GEMINI_KEY)
 
+@app.route('/pull_desc', methods =['POST'])
+def handle_desc():
+    name = request.form['name']
+    response = client.models.generate_content(
+    model="gemini-2.5-flash",
+    contents="Based on the piece: " + name + "generate a short 2-3 sentence description about it.",
+    )
+    return response.text
 
 @app.route('/receive_scan', methods=['POST'])
 def handle_scan():
@@ -15,7 +27,6 @@ def handle_scan():
         where = request.form['where']
 
         #load supabase
-        load_dotenv()
         url: str = os.environ.get("SUPABASE_URL")
         key: str = os.environ.get("SUPABASE_KEY")
         supabase: Client = create_client(url, key)
@@ -35,7 +46,6 @@ def handle_scan():
 def handle_profile():
     if request.method == 'POST':
         id = request.form['id']
-        load_dotenv()
         url: str = os.environ.get("SUPABASE_URL")
         key: str = os.environ.get("SUPABASE_KEY")
         supabase: Client = create_client(url, key)
@@ -46,7 +56,6 @@ def handle_profile():
 def handle_collection():
     if request.method == 'POST':
         id = request.form['id']
-        load_dotenv()
         url: str = os.environ.get("SUPABASE_URL")
         key: str = os.environ.get("SUPABASE_KEY")
         supabase: Client = create_client(url, key)

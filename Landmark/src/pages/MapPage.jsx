@@ -1,5 +1,6 @@
-import { useCallback, useMemo, useState } from "react";
-import { GoogleMap, Marker, DirectionsRenderer, useJsApiLoader } from "@react-google-maps/api";
+import { useCallback, useMemo, useState, useRef, useEffect } from "react";
+import { GoogleMap, Marker, useJsApiLoader } from "@react-google-maps/api";
+import { useLocation } from "react-router-dom";
 import {
   FiCompass,
   FiInfo,
@@ -19,22 +20,32 @@ const mapOptions = {
   streetViewControl: false,
   mapTypeControl: false,
   zoomControl: true,
+  styles: [
+    { featureType: "road", elementType: "geometry.stroke", stylers: [{ color: "#000000" }, { visibility: "on" }] },
+    { featureType: "road", elementType: "geometry", stylers: [{ color: "#ffffff" }] },
+    { featureType: "road", elementType: "labels.text.fill", stylers: [{ color: "#000000" }] },
+    { featureType: "road", elementType: "labels.text.stroke", stylers: [{ color: "#ffffff" }] },
+    { featureType: "transit.line", elementType: "geometry", stylers: [{ visibility: "off" }] },
+    { featureType: "transit.station", elementType: "geometry", stylers: [{ visibility: "off" }] },
+    { featureType: "poi.park", elementType: "geometry", stylers: [{ color: "#e5e5e5" }] },
+    { featureType: "all", elementType: "labels.icon", stylers: [{ visibility: "off" }] },
+  ],
 };
 
 function MapPage() {
+  const bicyclingLayerRef = useRef(null);
+  const directionsRendererRef = useRef(null);
   const [map, setMap] = useState(null);
   const [userPosition, setUserPosition] = useState(null);
-  const [directions, setDirections] = useState(null);
-  const [directionsKey, setDirectionsKey] = useState(0);
   const [routeInfo, setRouteInfo] = useState(null);
   const [status, setStatus] = useState("Enter origin and destination to plan a route.");
   const [travelMode, setTravelMode] = useState("WALKING");
   const [originValue, setOriginValue] = useState("");
   const [destinationValue, setDestinationValue] = useState("");
 
+  const location = useLocation(); // For query params
   const apiKey = import.meta.env.VITE_GOOGLE_MAPS_KEY;
 
-  // ✅ Use official loader to avoid duplicate scripts
   const { isLoaded, loadError } = useJsApiLoader({
     googleMapsApiKey: apiKey,
     libraries: ["places"],
@@ -43,12 +54,26 @@ function MapPage() {
   const handleMapLoad = useCallback((mapInstance) => setMap(mapInstance), []);
   const handleMapUnmount = useCallback(() => setMap(null), []);
 
+  // Pan to coordinates from query params if available
+  useEffect(() => {
+    if (!map) return;
+    const params = new URLSearchParams(location.search);
+    const lat = parseFloat(params.get("lat"));
+    const lng = parseFloat(params.get("lng"));
+    if (!isNaN(lat) && !isNaN(lng)) {
+      const position = { lat, lng };
+      map.panTo(position);
+      map.setZoom(16);
+      setDestinationValue(`${lat},${lng}`);
+      setStatus(`Focused on ${lat.toFixed(3)}, ${lng.toFixed(3)}`);
+    }
+  }, [location.search, map]);
+
   const handleLocate = useCallback(() => {
     if (!navigator.geolocation) {
       setStatus("Geolocation not supported.");
       return;
     }
-
     setStatus("Locating you…");
     navigator.geolocation.getCurrentPosition(
       (pos) => {
@@ -56,15 +81,21 @@ function MapPage() {
         setUserPosition(nextPosition);
         map?.panTo(nextPosition);
         map?.setZoom(14);
-        setStatus("You are here. Enter a destination.");
+
+        // Fill Starting Point input
+        setOriginValue(`${nextPosition.lat},${nextPosition.lng}`);
+
+        setStatus("You are here. Coordinates set as starting point.");
       },
       () => setStatus("Unable to retrieve location.")
     );
   }, [map]);
 
   const handleClear = useCallback(() => {
-    setDirections(null);
-    setDirectionsKey((k) => k + 1);
+    if (directionsRendererRef.current) {
+      directionsRendererRef.current.setMap(null);
+      directionsRendererRef.current = null;
+    }
     setRouteInfo(null);
     setOriginValue("");
     setDestinationValue("");
@@ -76,13 +107,18 @@ function MapPage() {
       setStatus("Enter both origin and destination.");
       return;
     }
-
-    if (!window.google?.maps) {
-      setStatus("Map still loading. Try again shortly.");
+    if (!window.google?.maps || !map) {
+      setStatus("Map not ready. Try again shortly.");
       return;
     }
-
     setStatus("Calculating route…");
+
+    if (travelMode === "BICYCLING") {
+      if (!bicyclingLayerRef.current && window.google.maps.BicyclingLayer) {
+        bicyclingLayerRef.current = new window.google.maps.BicyclingLayer();
+      }
+      bicyclingLayerRef.current?.setMap(null);
+    }
 
     const service = new window.google.maps.DirectionsService();
     service.route(
@@ -93,8 +129,11 @@ function MapPage() {
       },
       (result, status) => {
         if (status === "OK" && result) {
-          setDirections(result);
-          setDirectionsKey((k) => k + 1);
+          if (!directionsRendererRef.current) {
+            directionsRendererRef.current = new window.google.maps.DirectionsRenderer();
+          }
+          directionsRendererRef.current.setMap(map);
+          directionsRendererRef.current.setDirections(result);
           const leg = result.routes[0]?.legs[0];
           if (leg) {
             setRouteInfo({
@@ -109,7 +148,7 @@ function MapPage() {
         }
       }
     );
-  }, [originValue, destinationValue, travelMode]);
+  }, [originValue, destinationValue, travelMode, map]);
 
   const mapCenter = useMemo(() => userPosition || defaultCenter, [userPosition]);
 
@@ -208,7 +247,6 @@ function MapPage() {
             zoom={12}
           >
             {userPosition && <Marker position={userPosition} />}
-            {directions && <DirectionsRenderer directions={directions} />}
           </GoogleMap>
         ) : (
           <div className="map-overlay">

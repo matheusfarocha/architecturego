@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useLocation } from 'react-router-dom';
 import { FiCamera } from 'react-icons/fi';
-import { TbBook2 } from 'react-icons/tb';
+import { TbBook2, TbMapPin } from 'react-icons/tb';
 import { FaRegCompass } from 'react-icons/fa';
 import placeholderProfile from '../assets/profile-placeholder.svg';
 import './AppLayout.css';
@@ -21,22 +21,23 @@ function AppLayout() {
 
   return (
     <div className="app-shell">
-      <main className="app-main">
-        <Outlet context={{ pathname: location.pathname }} />
-      </main>
-      <nav className="bottom-nav gradient-card">
+      <nav className="side-nav">
         {navItems.map((item) => (
           <NavLink
             key={item.to}
             to={item.to}
-            aria-label={item.label}
             className={({ isActive }) => `nav-item${isActive ? ' is-active' : ''}`}
+            aria-label={item.label}
           >
             <div className="nav-icon">{item.icon}</div>
-            <span>{item.label}</span>
+            <span className="nav-label">{item.label}</span>
           </NavLink>
         ))}
       </nav>
+
+      <main className="app-main">
+        <Outlet context={{ pathname: location.pathname }} />
+      </main>
     </div>
   );
 }

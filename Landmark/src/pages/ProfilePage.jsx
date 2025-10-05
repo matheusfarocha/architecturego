@@ -1,14 +1,30 @@
 import './ProfilePage.css';
 import { useState } from 'react';
-import placeholderProfile from '../assets/profile-placeholder.svg';
-
-const XP_TOTAL = 100;
-const CURRENT_XP = 72;
-const LEVEL = 3;
+import { Link } from 'react-router-dom';
+import { useLandmarks } from '../context/LandmarkContext.jsx';
 
 function ProfilePage() {
+  const { captures } = useLandmarks();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalType, setModalType] = useState(null);
+
+  const XP_PER_CAPTURE = 50;
+  const XP_TOTAL = 100;
+
+  // Total XP accumulated
+  const totalXP = captures.length * XP_PER_CAPTURE;
+
+  // Level (starts at 1, increases every 100 XP)
+  const LEVEL = Math.floor(totalXP / XP_TOTAL) + 1;
+
+  // XP currently in this level
+  const CURRENT_XP = totalXP % XP_TOTAL;
+
+  // Progress percentage
+  const progressPercent =
+    totalXP === 0
+      ? 0
+      : Math.min(((totalXP % XP_TOTAL) / XP_TOTAL) * 100, 100);
 
   const openModal = (type) => {
     setModalType(type);
@@ -25,9 +41,7 @@ function ProfilePage() {
       <div className="profile-card gradient-card">
         <div className="profile-hero">
           <div className="profile-avatar-container">
-            <div className="profile-avatar">
-              <img src={placeholderProfile} alt="User avatar" />
-            </div>
+
             <span className="profile-level">Level {LEVEL}</span>
           </div>
           <div className="profile-basics">
@@ -44,39 +58,50 @@ function ProfilePage() {
             </span>
           </div>
           <div className="progress-bar">
-            <div className="progress-fill" style={{ width: `${(CURRENT_XP / XP_TOTAL) * 100}%` }} />
+            <div
+              className="progress-fill"
+              style={{ width: `${progressPercent}%` }}
+            />
           </div>
           <p className="progress-note">
-            Explore more landmarks to level up and unlock exclusive travel badges.
+            Explore more landmarks to level up and unlock exclusive travel
+            badges.
           </p>
         </div>
 
         <div className="profile-stats">
-          <div className="stat-card surface-card" onClick={() => openModal('landmarks')}>
-            <strong>28</strong>
-            <span>Landmarks logged</span>
+          <div className="stat-card surface-card">
+            <Link
+              to="/app/library"
+              style={{ textDecoration: 'none', color: 'inherit' }}
+            >
+              <strong>{captures.length}</strong>
+              <span>Landmarks logged</span>
+            </Link>
           </div>
-          <div className="stat-card surface-card" onClick={() => openModal('countries')}>
-            <strong>12</strong>
-            <span>Countries visited</span>
-          </div>
-          <div className="stat-card surface-card" onClick={() => openModal('badges')}>
-            <strong>7</strong>
+
+          <div
+            className="stat-card surface-card"
+
+          >
+            <strong>{Math.floor(LEVEL / 2)}</strong>
             <span>Badges earned</span>
           </div>
+
         </div>
 
         {modalOpen && (
           <div className="modal-backdrop" onClick={closeModal}>
-            <div className="modal-content onClick={(e) => e.stopPropagation()}">
-              <button className="modal-close" onClick={closeModal}>x</button>
+            <div className="modal-content" onClick={(e) => e.stopPropagation()}>
+              <button className="modal-close" onClick={closeModal}>
+                ×
+              </button>
               {modalType === 'landmarks' && <p>Landmark details...</p>}
               {modalType === 'countries' && <p>Countries details...</p>}
-              {modalType === 'badges' && <p>Badges details...</p>}
+
             </div>
           </div>
         )}
-
       </div>
     </section>
   );

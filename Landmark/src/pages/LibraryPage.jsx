@@ -1,10 +1,23 @@
-import { FiCamera } from 'react-icons/fi';
-import { TbMapPin } from 'react-icons/tb';
 import { useLandmarks } from '../context/LandmarkContext.jsx';
+import { useNavigate } from 'react-router-dom';
+import { FiCamera, FiTrash2 } from 'react-icons/fi';
+import { TbMapPin } from 'react-icons/tb';
 import './LibraryPage.css';
 
 function LibraryPage() {
-  const { captures } = useLandmarks();
+  const { captures, deleteCapture, getSummary } = useLandmarks();
+  const navigate = useNavigate(); // add this
+
+  const handleDelete = (id) => {
+    if (window.confirm('Are you sure you want to delete this snapshot?')) {
+      deleteCapture(id);
+    }
+  };
+
+  const handleViewOnMap = (lat, lng) => {
+    // Navigate to the correct Map route with coordinates as query params
+    navigate(`/app/map?lat=${lat}&lng=${lng}`);
+  };
 
   return (
     <section className="library-page">
@@ -27,14 +40,14 @@ function LibraryPage() {
         </div>
       ) : (
         <div className="library-grid">
-          {captures.map((capture) => {
+          {captures.slice().reverse().map((capture) => {
             const displayName = capture.name || 'Snapshot';
             const capturedAt = new Date(capture.timestamp);
             const hasLabels = Array.isArray(capture.labels) && capture.labels.length > 0;
             const hasLocation = Boolean(capture.location?.latitude) && Boolean(capture.location?.longitude);
             const hasConfidence = typeof capture.score === 'number';
             const hasError = Boolean(capture.analysisError);
-            // Description feature removed
+            const aiGuide = getSummary(capture.name);
 
             return (
               <article key={capture.id} className="library-card surface-card">
@@ -43,7 +56,15 @@ function LibraryPage() {
                   {hasConfidence && (
                     <span className="library-badge">{Math.round(capture.score * 100)}% match</span>
                   )}
+                  <button
+                    className="delete-btn"
+                    onClick={() => handleDelete(capture.id)}
+                    title="Delete image"
+                  >
+                    <FiTrash2 />
+                  </button>
                 </div>
+
                 <div className="library-content">
                   <h3>{displayName}</h3>
                   <p className="library-time">
@@ -54,25 +75,43 @@ function LibraryPage() {
                       minute: '2-digit',
                     })}
                   </p>
+
                   {hasLocation && (
                     <p className="library-location">
-                      <TbMapPin />
+                      <TbMapPin size={16} />
                       Lat {capture.location.latitude.toFixed(3)} · Lon {capture.location.longitude.toFixed(3)}
+                      <button
+                        className="view-map-btn"
+                        onClick={() => handleViewOnMap(capture.location.latitude, capture.location.longitude)}
+                      >
+                        View on Map
+                      </button>
                     </p>
                   )}
-                  {hasLabels ? (
+
+                  {hasLabels && (
                     <div className="library-tags">
                       {capture.labels.slice(0, 4).map((label) => (
                         <span key={`${capture.id}-${label.description}`}>{label.description}</span>
                       ))}
                     </div>
-                  ) : (
-                    <p className={`library-note${hasError ? ' library-warning' : ''}`}>
-                      {hasError ? 'Vision service unavailable—snapshot saved for later.' : 'Saved from the live camera.'}
+                  )}
+
+                  {!hasLabels && !hasError && (
+                    <p className="library-note">Saved from the live camera.</p>
+                  )}
+
+                  {hasError && (
+                    <p className="library-note library-warning">
+                      Vision service unavailable: {capture.analysisError}
                     </p>
                   )}
-                  {hasError && (
-                    <p className="library-note library-warning">{capture.analysisError}</p>
+
+                  {aiGuide && (
+                    <div className="library-ai-guide">
+                      {aiGuide.description && <p className="ai-description">{aiGuide.description}</p>}
+                      {aiGuide.funFact && <p className="ai-funfact">Fun fact: {aiGuide.funFact}</p>}
+                    </div>
                   )}
                 </div>
               </article>

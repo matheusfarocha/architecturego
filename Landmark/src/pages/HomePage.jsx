@@ -21,46 +21,40 @@ function HomePage() {
   const [aiError, setAiError] = useState(null);
   const [aiGuide, setAiGuide] = useState(null);
 
+  const MIN_CONFIDENCE = 0.5; // Only save snapshots if confidence >= 50%
+
+  // --- Initialize camera
   useEffect(() => {
     const requestStream = async () => {
       try {
         setStatus('Initializing camera…');
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            facingMode: 'environment',
-            width: { ideal: 1920, max: 2560 },
-            height: { ideal: 1080, max: 1440 },
-            frameRate: { ideal: 30, max: 60 },
-          },
+          video: { facingMode: 'environment', width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
           audio: false,
         });
         streamRef.current = stream;
         setPermission('granted');
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
+        if (videoRef.current) videoRef.current.srcObject = stream;
       } catch (error) {
-        console.error('Unable to access camera', error);
+        console.error('Camera access failed', error);
         setPermission('denied');
         setStatus('Camera permission denied.');
       }
     };
 
     requestStream();
-
     return () => {
       if (streamRef.current) {
-        streamRef.current.getTracks().forEach((track) => track.stop());
+        streamRef.current.getTracks().forEach(track => track.stop());
         streamRef.current = null;
       }
     };
   }, []);
 
+  // --- Handle video ready
   useEffect(() => {
     const video = videoRef.current;
-    if (!video) {
-      return undefined;
-    }
+    if (!video) return;
 
     const handleLoaded = () => {
       video.play().catch(() => undefined);
@@ -69,15 +63,12 @@ function HomePage() {
     };
 
     video.addEventListener('loadedmetadata', handleLoaded);
-    return () => {
-      video.removeEventListener('loadedmetadata', handleLoaded);
-    };
+    return () => video.removeEventListener('loadedmetadata', handleLoaded);
   }, []);
 
+  // --- Capture snapshot
   const handleCapture = async () => {
-    if (!videoRef.current || !canvasRef.current) {
-      return;
-    }
+    if (!videoRef.current || !canvasRef.current) return;
     if (!videoReady) {
       setStatus('Hold on—camera feed is still starting.');
       return;
@@ -110,37 +101,31 @@ function HomePage() {
     }
 
     const primary = annotations[0] || null;
-    // Description feature removed
+    const hasValidMatch = primary && primary.score >= MIN_CONFIDENCE;
 
     const capture = {
       id: `${Date.now()}`,
       name: primary?.description || defaultName,
       timestamp,
       image: dataUrl,
-      labels: annotations.map((annotation) => ({
-        description: annotation.description,
-        score: annotation.score,
-      })),
+      labels: annotations.map(a => ({ description: a.description, score: a.score })),
       location: primary?.location || null,
       score: primary?.score || null,
       analysisError,
     };
 
-    addCapture(capture);
-    setLastSnapshot(capture);
-
-    if (primary?.description) {
+    if (hasValidMatch) {
+      addCapture(capture);
       setStatus(`Landmark detected: ${primary.description}`);
-    } else if (analysisError) {
-      setStatus('Snapshot saved—landmark insight unavailable right now.');
     } else {
-      setStatus('Snapshot saved—no landmarks detected.');
+      setStatus('Snapshot ignored—no confident landmark detected.');
     }
 
+    setLastSnapshot(capture);
     setIsSaving(false);
 
-    // Trigger AI guide generation if we have a primary landmark
-    if (primary?.description && !analysisError) {
+    // --- Generate AI guide if we have a valid primary landmark
+    if (hasValidMatch && !analysisError) {
       setAiLoading(true);
       try {
         const guide = await chatAboutLocation(primary.description, primary.location);
@@ -157,7 +142,6 @@ function HomePage() {
   const snapshotHasLabels = Array.isArray(lastSnapshot?.labels) && lastSnapshot.labels.length > 0;
   const snapshotHasLocation = Boolean(lastSnapshot?.location?.latitude) && Boolean(lastSnapshot?.location?.longitude);
   const snapshotHasError = Boolean(lastSnapshot?.analysisError);
-  // Description fields removed
 
   return (
     <section className="home-page">
@@ -185,13 +169,9 @@ function HomePage() {
           {permission === 'denied' && (
             <div className="camera-overlay warning">
               <FiInfo size={24} />
-              <p>
-                Camera access is blocked. Allow camera permissions in your browser settings and refresh
-                the page.
-              </p>
+              <p>Camera access is blocked. Allow camera permissions and refresh.</p>
             </div>
           )}
-
           <div className="camera-frame gradient-card">
             <video ref={videoRef} playsInline autoPlay muted />
             <canvas ref={canvasRef} className="hidden-canvas" />
@@ -201,26 +181,16 @@ function HomePage() {
 
       <div className="gradient-card" style={{ marginTop: '1rem' }}>
         <h3>AI Guide</h3>
-        {!videoReady && !lastSnapshot && (
-          <p>Capture a snapshot to get a description and a fun fact.</p>
-        )}
+        {!videoReady && !lastSnapshot && <p>Capture a snapshot to get a description and fun fact.</p>}
         {aiLoading && <p>Generating a short description and fun fact…</p>}
-        {!aiLoading && aiError && (
-          <p className="snapshot-warning">{aiError}</p>
-        )}
+        {!aiLoading && aiError && <p className="snapshot-warning">{aiError}</p>}
         {!aiLoading && !aiError && aiGuide && (
           <div>
-            {aiGuide.description && (
-              <p className="snapshot-description">{aiGuide.description}</p>
-            )}
-            {aiGuide.funFact && (
-              <p className="snapshot-note">Fun fact: {aiGuide.funFact}</p>
-            )}
+            {aiGuide.description && <p className="snapshot-description">{aiGuide.description}</p>}
+            {aiGuide.funFact && <p className="snapshot-note">Fun fact: {aiGuide.funFact}</p>}
           </div>
         )}
-        {!aiLoading && !aiError && !aiGuide && videoReady && (
-          <p>Point your camera at a landmark, then capture to get insights.</p>
-        )}
+        {!aiLoading && !aiError && !aiGuide && videoReady && <p>Point your camera at a landmark, then capture to get insights.</p>}
       </div>
 
       {lastSnapshot && (
@@ -233,12 +203,7 @@ function HomePage() {
             <div className="snapshot-details">
               <h4>{lastSnapshot.name}</h4>
               <p className="snapshot-time">
-                Captured {new Date(lastSnapshot.timestamp).toLocaleString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
+                Captured {new Date(lastSnapshot.timestamp).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
               </p>
               {snapshotHasLocation && (
                 <p className="snapshot-location">
@@ -248,16 +213,14 @@ function HomePage() {
               )}
               {snapshotHasLabels ? (
                 <div className="snapshot-tags">
-                  {lastSnapshot.labels.slice(0, 4).map((label) => (
+                  {lastSnapshot.labels.slice(0, 4).map(label => (
                     <span key={`${lastSnapshot.id}-${label.description}`}>{label.description}</span>
                   ))}
                 </div>
               ) : (
                 <p className="snapshot-note">No landmarks detected this time.</p>
               )}
-              {snapshotHasError && (
-                <p className="snapshot-warning">Vision service unavailable: {lastSnapshot.analysisError}</p>
-              )}
+              {snapshotHasError && <p className="snapshot-warning">Vision service unavailable: {lastSnapshot.analysisError}</p>}
               <p className="snapshot-note snapshot-library-note">Find every saved moment in your library tab.</p>
             </div>
           </div>

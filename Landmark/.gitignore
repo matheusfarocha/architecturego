@@ -1,0 +1,23 @@
+.env
+.env.*
+*.env
+*.local
+
+# Dependencies and builds
+node_modules/
+dist/
+.cache/
+.turbo/
+
+# Vite cache
+.vite/
+
+# OS junk
+.DS_Store
+
+# Logs
+*.log
+logs/
+
+# Local credentials
+lankdmark-*.json

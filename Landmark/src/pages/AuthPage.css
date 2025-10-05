@@ -1,0 +1,93 @@
+/* ===== App Shell ===== */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  position: relative;
+}
+
+/* ===== Side Nav (Desktop) ===== */
+.side-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 72px; /* compact, can expand if needed */
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 0;
+  background: rgba(255, 255, 255, 0.05); /* transparent */
+  backdrop-filter: blur(10px);           /* glass effect */
+  z-index: 1000;
+}
+
+.side-nav:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Nav Links */
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-decoration: none;
+  color: var(--color-primary);
+  font-weight: 500;
+  margin: 1rem 0;
+  transition: color 0.2s ease, transform 0.2s ease;
+}
+
+.nav-item .nav-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.nav-item .nav-label {
+  font-size: 0.75rem;
+  margin-top: 0.25rem;
+  text-align: center;
+}
+
+.nav-item.is-active {
+  color: var(--color-secondary);
+  transform: scale(1.1);
+}
+
+/* ===== Main Content ===== */
+.app-main {
+  flex: 1;
+  margin-left: 72px; /* same as side nav width */
+  padding: 1.5rem;
+}
+
+/* ===== Responsive: Mobile Bottom Nav ===== */
+@media (max-width: 768px) {
+  .side-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    justify-content: space-around;
+    padding: 0;
+    backdrop-filter: blur(8px);
+    background: rgba(255, 255, 255, 0.05);
+  }
+
+  .app-main {
+    margin-left: 0;
+    padding-bottom: 80px; /* give space for bottom nav */
+  }
+
+  .nav-item {
+    flex-direction: column;
+    margin: 0;
+  }
+
+  .nav-item .nav-label {
+    display: none; /* hide labels on small screens */
+  }
+}

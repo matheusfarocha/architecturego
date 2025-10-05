@@ -1,0 +1,227 @@
+/* ===== Library Page Grid ===== */
+.library-page {
+  display: grid;
+  gap: clamp(2rem, 3vw, 2.8rem);
+}
+
+/* ===== Header ===== */
+.library-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 1.5rem;
+}
+
+.library-header h2 {
+  margin: 0;
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
+  font-family: 'Playfair Display', serif;
+  color: var(--color-secondary);
+}
+
+.library-header p {
+  margin-top: 0.5rem;
+  color: var(--color-muted);
+}
+
+/* ===== Empty State ===== */
+.library-empty {
+  padding: clamp(2rem, 4vw, 3rem);
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 1rem;
+  color: var(--color-secondary);
+  background: var(--color-surface);
+  border-radius: 24px;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.library-empty:hover {
+  transform: translateY(-2px);
+  border-color: rgba(45, 106, 79, 0.3);
+}
+
+.library-empty svg {
+  color: var(--color-primary);
+}
+
+.library-empty h3 {
+  margin: 0;
+  font-size: 1.5rem;
+}
+
+.library-empty p {
+  margin: 0;
+  color: var(--color-muted);
+  max-width: 360px;
+}
+
+/* ===== Grid of Cards ===== */
+.library-grid {
+  display: grid;
+  gap: 1.8rem;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+}
+
+/* ===== Card Box ===== */
+.library-card,
+.card-box {
+  display: grid;
+  grid-template-rows: auto 1fr;
+  border-radius: 16px;
+  overflow: hidden;
+  background: var(--color-surface);
+  border: 1px solid rgba(0, 0, 0, 0.12); /* full visible border */
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.library-card:hover,
+.card-box:hover {
+  transform: translateY(-2px);
+  border-color: rgba(45, 106, 79, 0.3);
+  box-shadow: var(--shadow-soft-md);
+}
+
+/* ===== Card Image ===== */
+.library-image,
+.card-image {
+  position: relative;
+  width: 100%;
+  height: auto;
+  background: #0f0f0f;
+}
+
+.library-image img,
+.card-image img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  display: block;
+  transition: transform 0.2s ease;
+}
+
+.library-image:hover img,
+.card-image:hover img {
+  transform: scale(1.03);
+}
+
+/* ===== Badge ===== */
+.library-badge,
+.card-badge {
+  position: absolute;
+  bottom: 12px;
+  left: 12px;
+  padding: 0.35rem 0.75rem;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  background: rgba(45, 106, 79, 0.9);
+  color: #f4efe6;
+}
+
+/* ===== Card Content ===== */
+.library-content,
+.card-content {
+  padding: 1.5rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between; /* ensures content fills middle */
+  gap: 0.75rem;
+  flex: 1; /* makes content stretch inside the card */
+}
+
+.library-content h3,
+.card-content h3 {
+  margin: 0;
+  font-size: 1.2rem;
+  color: var(--color-secondary);
+}
+
+.library-time,
+.card-time {
+  margin: 0;
+  font-size: 0.92rem;
+  color: var(--color-muted);
+}
+
+/* ===== Location ===== */
+.library-location,
+.card-location {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  color: var(--color-primary);
+  font-weight: 500;
+}
+
+.library-location svg,
+.card-location svg {
+  color: var(--color-secondary);
+}
+
+/* ===== Tags ===== */
+.library-tags,
+.card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+.library-tags span,
+.card-tags span {
+  padding: 0.25rem 0.7rem;
+  border-radius: 999px;
+  background: rgba(75, 54, 33, 0.12);
+  color: var(--color-secondary);
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+/* ===== Notes & Warnings ===== */
+.library-note,
+.card-note {
+  font-size: 0.88rem;
+  color: var(--color-muted);
+  margin: 0;
+}
+
+.library-warning,
+.card-warning {
+  color: #a23c34;
+  font-weight: 500;
+}
+
+/* ===== Description / AI Guide ===== */
+.library-description,
+.card-description {
+  margin: 0;
+  font-size: 0.94rem;
+  line-height: 1.6;
+  color: var(--color-secondary);
+}
+
+/* ===== Buttons inside cards ===== */
+.library-card button,
+.card-box button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-primary);
+  transition: color 0.2s ease;
+}
+
+.library-card button:hover,
+.card-box button:hover {
+  color: var(--color-secondary);
+}
+
+/* ===== Responsive tweaks ===== */
+@media (max-width: 480px) {
+  .library-grid {
+    grid-template-columns: 1fr;
+  }
+}
